@@ -134,7 +134,10 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
             <p className="text-slate-600">Welcome, {user.name}</p>
           </div>
-          <Button variant="outline" onClick={logout}>Logout</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.push('/admin/analytics')}>Analytics</Button>
+            <Button variant="outline" onClick={logout}>Logout</Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-4 mb-6">
