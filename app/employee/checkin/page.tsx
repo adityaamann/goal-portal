@@ -8,47 +8,62 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { toast, Toaster } from 'sonner'
+import { toast } from 'sonner'
+
+const fetchCheckin = async (userId: string) => {
+  const { data: sheet } = await supabase
+    .from('goal_sheets')
+    .select('id, status, goals(*)')
+    .eq('employee_id', userId)
+    .eq('status', 'approved')
+    .single()
+  if (!sheet) return { goals: [], achievements: {} }
+  const goalIds = (sheet.goals as any[]).map(g => g.id)
+  const { data: ach } = await supabase.from('achievements').select('*').in('goal_id', goalIds)
+  const map: Record<string, any> = {}
+  ach?.forEach(a => { map[`${a.goal_id}-${a.quarter}`] = a })
+  return { goals: sheet.goals as any[], achievements: map }
+}
 
 export default function Checkin() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
-  const [goals, setGoals] = useState<any[]>([])
+  const [data, setData] = useState<{ goals: any[]; achievements: Record<string, any> } | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const [achievements, setAchievements] = useState<Record<string, any>>({})
   const [quarter, setQuarter] = useState('Q1')
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const u = localStorage.getItem('user')
     if (!u) return router.push('/')
-    const parsed = JSON.parse(u)
-    setUser(parsed)
-    load(parsed.id)
+    setUser(JSON.parse(u))
   }, [])
 
-  const load = async (userId: string) => {
-    setLoading(true)
-    const { data: sheet } = await supabase
-      .from('goal_sheets')
-      .select('id, status, goals(*)')
-      .eq('employee_id', userId)
-      .eq('status', 'approved')
-      .single()
+  useEffect(() => {
+    if (!user) return
+    const loadData = async () => {
+      setIsLoading(true)
+      try {
+        const next = await fetchCheckin(user.id)
+        setData(next)
+      } catch {
+        toast.error('Failed to load check-in data')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+  }, [user])
 
-    if (!sheet) { setGoals([]); setLoading(false); return }
-    setGoals(sheet.goals)
+  useEffect(() => {
+    if (data?.achievements) setAchievements(data.achievements)
+  }, [data])
 
-    const goalIds = sheet.goals.map((g: any) => g.id)
-    const { data: ach } = await supabase.from('achievements').select('*').in('goal_id', goalIds)
-    const map: Record<string, any> = {}
-    ach?.forEach(a => { map[`${a.goal_id}-${a.quarter}`] = a })
-    setAchievements(map)
-    setLoading(false)
-  }
+  const goals = data?.goals ?? []
 
   const updateAch = (goalId: string, field: string, value: any) => {
     const key = `${goalId}-${quarter}`
-    setAchievements({ ...achievements, [key]: { ...(achievements[key] || { goal_id: goalId, quarter }), [field]: value } })
+    setAchievements(prev => ({ ...prev, [key]: { ...(prev[key] || { goal_id: goalId, quarter }), [field]: value } }))
   }
 
   const save = async (goalId: string) => {
@@ -60,7 +75,6 @@ export default function Checkin() {
     }, { onConflict: 'goal_id,quarter' })
     if (error) return toast.error(error.message)
     toast.success('Saved')
-    load(user.id)
   }
 
   const progress = (g: any, a: any) => {
@@ -76,14 +90,13 @@ export default function Checkin() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
-      <Toaster position="top-right" />
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Quarterly Check-in</h1>
           <Button variant="outline" onClick={() => router.push('/employee')}>Back</Button>
         </div>
 
-        {loading ? <p>Loading...</p> : goals.length === 0 ? (
+        {isLoading ? <p>Loading...</p> : goals.length === 0 ? (
           <Card className="p-6 text-center text-slate-500">No approved goals yet. Wait for manager approval.</Card>
         ) : (
           <Tabs value={quarter} onValueChange={setQuarter}>

@@ -5,46 +5,57 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { toast, Toaster } from 'sonner'
+import { toast } from 'sonner'
+
+const fetchManagerSheets = async (managerId: string) => {
+  const { data: team } = await supabase.from('users').select('id').eq('manager_id', managerId)
+  if (!team || team.length === 0) return []
+  const { data } = await supabase
+    .from('goal_sheets')
+    .select('*, goals(*), users!goal_sheets_employee_id_fkey(full_name)')
+    .in('employee_id', team.map(t => t.id))
+    .order('submitted_at', { ascending: false })
+  return data || []
+}
 
 export default function ManagerDashboard() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [sheets, setSheets] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     const u = localStorage.getItem('user')
     if (!u) return router.push('/')
-    const parsed = JSON.parse(u)
-    setUser(parsed)
-    loadSheets(parsed.id)
+    setUser(JSON.parse(u))
   }, [])
 
-  const loadSheets = async (managerId: string) => {
-    setLoading(true)
-    const { data: team } = await supabase.from('users').select('id, full_name').eq('manager_id', managerId)
-    if (!team || team.length === 0) { setSheets([]); setLoading(false); return }
-    const teamIds = team.map(t => t.id)
-
-    const { data } = await supabase
-      .from('goal_sheets')
-      .select('*, goals(*), users!goal_sheets_employee_id_fkey(full_name)')
-      .in('employee_id', teamIds)
-      .order('submitted_at', { ascending: false })
-
-    setSheets(data || [])
-    setLoading(false)
+  const loadSheets = async () => {
+    if (!user) return
+    setIsLoading(true)
+    const next = await fetchManagerSheets(user.id)
+    setSheets(next)
+    setIsLoading(false)
   }
 
+  useEffect(() => {
+    if (!user) return
+    loadSheets()
+  }, [user])
+
   const decide = async (sheetId: string, newStatus: 'approved' | 'returned') => {
+    const previous = sheets
+    setSheets(prev => prev.map(s => s.id === sheetId ? { ...s, status: newStatus } : s))
     const { error } = await supabase
       .from('goal_sheets')
       .update({ status: newStatus, approved_at: new Date().toISOString(), approved_by: user.id })
       .eq('id', sheetId)
-    if (error) return toast.error(error.message)
+    if (error) {
+      toast.error(error.message)
+      setSheets(previous)
+      return
+    }
     toast.success(`Goal sheet ${newStatus}`)
-    loadSheets(user.id)
   }
 
   const logout = () => { localStorage.removeItem('user'); router.push('/') }
@@ -53,7 +64,6 @@ export default function ManagerDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
-      <Toaster position="top-right" />
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -67,10 +77,10 @@ export default function ManagerDashboard() {
           <h2 className="text-lg font-semibold">Team Goal Sheets</h2>
           <Button variant="outline" onClick={() => router.push('/manager/checkin')}>Team Check-in</Button>
         </div>
-        
-        {loading ? <p>Loading...</p> : sheets.length === 0 ? <p className="text-slate-500">No submissions yet.</p> : (
+
+        {isLoading ? <p>Loading...</p> : sheets.length === 0 ? <p className="text-slate-500">No submissions yet.</p> : (
           <div className="space-y-4">
-            {sheets.map(s => (
+            {sheets.map((s: any) => (
               <Card key={s.id} className="p-4">
                 <div className="flex justify-between items-center mb-3">
                   <div>

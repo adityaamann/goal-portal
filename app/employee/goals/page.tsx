@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Trash2, Plus } from 'lucide-react'
-import { toast, Toaster } from 'sonner'
+import { toast } from 'sonner'
 
 type Goal = {
+  _key: number
   thrust_area: string
   title: string
   description: string
@@ -18,12 +19,13 @@ type Goal = {
   weightage: string
 }
 
-const emptyGoal: Goal = { thrust_area: '', title: '', description: '', uom: 'numeric_min', target: '', weightage: '' }
+let _keySeq = 0
+const newGoal = (): Goal => ({ _key: _keySeq++, thrust_area: '', title: '', description: '', uom: 'numeric_min', target: '', weightage: '' })
 
 export default function GoalCreate() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
-  const [goals, setGoals] = useState<Goal[]>([{ ...emptyGoal }])
+  const [goals, setGoals] = useState<Goal[]>(() => [newGoal()])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -35,7 +37,7 @@ export default function GoalCreate() {
   const totalWeightage = goals.reduce((sum, g) => sum + (Number(g.weightage) || 0), 0)
   const isValid = totalWeightage === 100 && goals.every(g => g.title && g.target && Number(g.weightage) >= 10)
 
-  const updateGoal = (i: number, field: keyof Goal, value: string) => {
+  const updateGoal = (i: number, field: keyof Omit<Goal, '_key'>, value: string) => {
     const next = [...goals]
     next[i][field] = value
     setGoals(next)
@@ -43,7 +45,7 @@ export default function GoalCreate() {
 
   const addGoal = () => {
     if (goals.length >= 8) return toast.error('Max 8 goals allowed')
-    setGoals([...goals, { ...emptyGoal }])
+    setGoals([...goals, newGoal()])
   }
 
   const removeGoal = (i: number) => {
@@ -86,7 +88,6 @@ export default function GoalCreate() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
-      <Toaster position="top-right" />
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Create Goal Sheet</h1>
@@ -108,7 +109,7 @@ export default function GoalCreate() {
 
         <div className="space-y-4">
           {goals.map((g, i) => (
-            <Card key={i} className="p-4">
+            <Card key={g._key} className="p-4">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-semibold">Goal {i + 1}</h3>
                 {goals.length > 1 && (
