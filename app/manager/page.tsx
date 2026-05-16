@@ -60,7 +60,11 @@ export default function ManagerDashboard() {
 
   const logout = () => { localStorage.removeItem('user'); router.push('/') }
 
-  if (!user) return null
+  if (!user) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <p className="text-slate-500">Loading...</p>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">

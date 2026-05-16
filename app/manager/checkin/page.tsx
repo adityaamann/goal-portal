@@ -45,6 +45,7 @@ export default function ManagerCheckin() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [team, setTeam] = useState<TeamMember[]>([])
+  const [isLoading, setIsLoading] = useState(false)
   const [quarter, setQuarter] = useState('Q1')
   const [comments, setComments] = useState<Record<string, string>>({})
 
@@ -56,11 +57,14 @@ export default function ManagerCheckin() {
 
   const loadTeam = async () => {
     if (!user) return
+    setIsLoading(true)
     try {
       const next = await fetchManagerCheckin(user.id)
       setTeam(next)
     } catch {
       toast.error('Failed to load team data')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -97,7 +101,11 @@ export default function ManagerCheckin() {
     toast.success('Comment saved')
   }
 
-  if (!user) return null
+  if (!user || isLoading) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <p className="text-slate-500">Loading...</p>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
