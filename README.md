@@ -74,7 +74,7 @@ Database tables:
 
 ## Local Setup
 
-git clone https://github.com/YOUR_USERNAME/atomberg-goal-portal.git
+git clone https://github.com/adityaamann/goal-portal.git
 cd atomberg-goal-portal
 npm install
 
